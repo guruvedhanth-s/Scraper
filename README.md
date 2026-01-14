@@ -71,26 +71,18 @@ Create a `config/credentials.json` file with the following structure:
   "scraperCredentials": {
     "apiUrl": "https://blacklight-backend-kko63bb3aa-el.a.run.app",
     "apiKey": "your-scraper-api-key-here"
-  },
-  "linkedin": {
-    "email": "your-linkedin-email@example.com",
-    "password": "your-linkedin-password"
-  },
-  "glassdoor": {
-    "cookies": "your-glassdoor-cookies-here"
   }
 }
 ```
 
 **Important**: 
 - Replace `your-scraper-api-key-here` with your actual Blacklight API key
-- Add LinkedIn credentials for LinkedIn scraping (optional)
-- Add Glassdoor cookies for Glassdoor scraping (optional)
+- LinkedIn and Glassdoor credentials are automatically fetched from the Blacklight backend
 - Never commit this file to version control (it's in .gitignore)
 
 ## 🎯 Usage
 
-### Start the Server
+### Start the Server (Production)
 
 ```bash
 npm start
@@ -99,12 +91,15 @@ npm start
 The server will start on `http://localhost:3000` with:
 - ✅ REST API endpoints available
 - ✅ Auto queue checker running (checks every 30 seconds)
+- ✅ Connects to Blacklight backend for queue and credentials
 
 ### Development Mode (with auto-restart)
 
 ```bash
 npm run dev
 ```
+
+Auto-restarts the server when you make code changes.
 
 ## 📡 API Endpoints
 
@@ -272,21 +267,14 @@ See `schemas/master-schema.json` for complete schema details.
 
 ## 🔐 Credential Management
 
-### LinkedIn Credentials
+### LinkedIn & Glassdoor Credentials
 
-LinkedIn scraping requires login credentials. The scraper:
-1. Fetches available credentials from Blacklight API
-2. Logs in using the credentials
-3. Scrapes jobs
-4. Reports success/failure back to API
+Both LinkedIn and Glassdoor scraping require authentication. The scraper automatically:
+1. **Fetches credentials** from Blacklight backend API
+2. **Uses credentials** for authenticated scraping
+3. **Reports success/failure** back to API for credential management
 
-### Glassdoor Cookies
-
-Glassdoor requires authentication cookies:
-1. Log in to Glassdoor manually in your browser
-2. Export cookies (using browser extension or DevTools)
-3. Add to `config/credentials.json`
-4. Cookies are used for authenticated requests
+**No manual credential configuration needed!** All credentials are managed through the Blacklight backend admin panel.
 
 ## 🐛 Troubleshooting
 
@@ -301,9 +289,9 @@ Glassdoor requires authentication cookies:
 - Check session status in Blacklight admin panel
 
 ### "No credentials available"
-- No LinkedIn/Glassdoor credentials in the pool
+- No LinkedIn/Glassdoor credentials in the backend pool
 - Add credentials via Blacklight admin panel
-- Or skip authenticated platforms
+- Scraper will automatically fetch them from the API
 
 ### Playwright Installation Issues
 
