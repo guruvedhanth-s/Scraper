@@ -1,0 +1,54 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Results
+results/*.json
+results/**/*.json
+
+# Configuration (sensitive)
+config/credentials.json
+
+# Cookies (sensitive)
+*.json.bak
+*cookies*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Browser artifacts
+.playwright/
+screenshots/
+*.png
+
+# Crawlee storage
+storage/
+apify_storage/
+
+# Test files
+test-*.js
+test-*.sh
+*-debug.js
+*.test.js
+*.spec.js
