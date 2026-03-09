@@ -46,8 +46,10 @@ async function isChromeRunning() {
 // Helper: Start Chrome with remote debugging
 async function startChromeWithDebugging() {
     return new Promise((resolve, reject) => {
-        const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-        const userDataDir = join(process.env.USERPROFILE, 'chrome-debug-profile');
+        const chromePath = process.platform === 'win32'
+            ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+            : (process.env.CHROME_PATH || '/usr/bin/google-chrome');
+        const userDataDir = join(process.env.HOME || process.env.USERPROFILE, 'chrome-debug-profile');
         
         logProgress('LinkedIn', '🚀 Starting Chrome with remote debugging...');
         

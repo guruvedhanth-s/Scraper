@@ -10,9 +10,6 @@ yarn.lock
 results/*.json
 results/**/*.json
 
-# Configuration (sensitive)
-config/credentials.json
-
 # Cookies (sensitive)
 *.json.bak
 *cookies*.json

@@ -1,8 +1,21 @@
 // Scraper Credentials Queue API Client
 // Manages credential fetching and reporting via API
+// Supports local credentials fallback when API is not configured
 
 import https from 'https';
+import fs from 'fs';
+import path from 'path';
 import { logProgress } from './utils.js';
+
+// Load local credentials from credentials.json
+function loadLocalCredentials() {
+    try {
+        const credentialsPath = path.join(process.cwd(), 'config', 'credentials.json');
+        return JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+    } catch {
+        return {};
+    }
+}
 
 // Create an HTTPS agent that ignores certificate errors (for development/self-signed certs)
 const httpsAgent = new https.Agent({
@@ -27,6 +40,20 @@ class CredentialsAPIClient {
      * @returns {Object|null} Credential object or null if none available
      */
     async getCredential(platform, sessionId = null) {
+        // --- Local credential fallback ---
+        // If no API is configured, use credentials.json directly
+        if (!this.apiBaseUrl || !this.apiKey) {
+            logProgress(platform, `📂 No API configured - using local credentials from credentials.json`);
+            const local = loadLocalCredentials();
+            const cred = local[platform.toLowerCase()];
+            if (!cred) {
+                logProgress(platform, `⚠️  No local credentials found for "${platform}" in credentials.json`);
+                return null;
+            }
+            // Return a credential-shaped object with a fake id so reportSuccess/reportFailure are no-ops
+            return { id: `local-${platform}`, ...cred };
+        }
+
         try {
             const url = `${this.apiBaseUrl}/api/scraper-credentials/queue/${platform}/next${sessionId ? `?session_id=${sessionId}` : ''}`;
             
@@ -86,6 +113,13 @@ class CredentialsAPIClient {
             return;
         }
 
+        // Skip API call for local credentials
+        if (credential.id && String(credential.id).startsWith('local-')) {
+            logProgress(platform, `✓ Local credential - no API report needed`);
+            this.activeCredentials.delete(platform);
+            return;
+        }
+
         try {
             const url = `${this.apiBaseUrl}/api/scraper-credentials/queue/${credential.id}/success`;
             
@@ -130,6 +164,13 @@ class CredentialsAPIClient {
         
         if (!credential) {
             console.warn(`⚠️  No active credential found for ${platform}`);
+            return;
+        }
+
+        // Skip API call for local credentials
+        if (credential.id && String(credential.id).startsWith('local-')) {
+            logProgress(platform, `⚠️  Local credential - no API failure report needed`);
+            this.activeCredentials.delete(platform);
             return;
         }
 
@@ -185,6 +226,13 @@ class CredentialsAPIClient {
             return;
         }
 
+        // Skip API call for local credentials
+        if (credential.id && String(credential.id).startsWith('local-')) {
+            logProgress(platform, `✓ Local credential released`);
+            this.activeCredentials.delete(platform);
+            return;
+        }
+
         try {
             const url = `${this.apiBaseUrl}/api/scraper-credentials/queue/${credential.id}/release`;
             
@@ -237,8 +285,8 @@ class CredentialsAPIClient {
     }
 }
 
-// Singleton instance
-let apiClient = null;
+// Singleton instance - auto-initialized in local mode
+let apiClient = new CredentialsAPIClient(null, null);
 
 /**
  * Initialize the credentials API client
@@ -247,7 +295,9 @@ let apiClient = null;
  */
 export function initializeCredentialsAPI(apiBaseUrl, apiKey) {
     if (!apiBaseUrl || !apiKey) {
-        throw new Error('API base URL and API key are required');
+        console.log('ℹ️  No API credentials provided - using local credentials mode');
+        apiClient = new CredentialsAPIClient(null, null);
+        return apiClient;
     }
     
     apiClient = new CredentialsAPIClient(apiBaseUrl, apiKey);
@@ -260,9 +310,6 @@ export function initializeCredentialsAPI(apiBaseUrl, apiKey) {
  * @returns {CredentialsAPIClient}
  */
 export function getCredentialsAPIClient() {
-    if (!apiClient) {
-        throw new Error('Credentials API client not initialized. Call initializeCredentialsAPI() first.');
-    }
     return apiClient;
 }
 

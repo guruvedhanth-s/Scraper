@@ -110,7 +110,8 @@ export function normalizeJobData(job, platform) {
             description: job.description || 'N/A',
             url: job.url || job.jobUrl || job.jobLink || 'N/A',
             applyUrl: job.applyUrl || job.url || job.jobUrl || job.jobLink || 'N/A',
-            postedDate: job.postedDate || job.datePosted || job.createdDate || 'N/A'
+            postedDate: job.postedDate || job.datePosted || job.createdDate || 'N/A',
+            validThrough: job.validThrough || null
         },
 
         // Company information
@@ -119,6 +120,8 @@ export function normalizeJobData(job, platform) {
             rating: job.rating || job.companyRating || null,
             about: job.companyData?.about || null,
             website: job.companyData?.website || null,
+            profileUrl: job.companyProfileUrl || job.companyData?.profileUrl || null,
+            logoUrl: job.companyLogoUrl || job.companyData?.logoUrl || null,
             headquarters: job.companyData?.headquarters || null,
             employeesCount: job.companyData?.employeesCount || null,
             foundedYear: job.companyData?.foundedYear || null,
@@ -128,20 +131,21 @@ export function normalizeJobData(job, platform) {
         // Location information
         location: {
             formatted: job.location || job.jobLocation || 'N/A',
-            city: null,  // Could be parsed from formatted
-            state: null,
-            country: null,
-            remote: job.location?.toLowerCase().includes('remote') || false,
+            city: job.city || null,
+            state: job.state || null,
+            country: job.country || null,
+            remote: job.isRemote || job.remote || job.location?.toLowerCase().includes('remote') || false,
+            workplaceType: job.workplaceType || null,
             companyLocation: job.companyLocation || null
         },
 
         // Compensation details
         compensation: {
             salary: job.salary || job.rate || job.salaryEstimate || job.compensationDetail || 'N/A',
-            salaryMin: null,  // Could be parsed from salary string
-            salaryMax: null,
-            currency: 'USD',
-            period: null  // Could be parsed from salary string
+            salaryMin: job.salary_min || job.salaryMin || null,
+            salaryMax: job.salary_max || job.salaryMax || null,
+            currency: job.salary_currency || job.salaryCurrency || 'USD',
+            period: job.salary_period || job.salaryPeriod || null
         },
 
         // Employment details
@@ -166,7 +170,9 @@ export function normalizeJobData(job, platform) {
         // Recruiter information (mainly for Dice)
         recruiter: job.recruiter ? {
             name: job.recruiter.name || job.recruiter,
+            title: job.recruiter.title || null,
             company: job.recruiter.company || null,
+            profileUrl: job.recruiter.profileUrl || null,
             contact: job.recruiter.contact || null
         } : null,
 
