@@ -33,7 +33,11 @@ try {
     console.log('✓ Credentials loaded successfully');
     
     // Initialize Credential API Client
-    if (credentials.scraperCredentials && credentials.scraperCredentials.apiUrl && credentials.scraperCredentials.apiKey) {
+    if (process.env.NODE_ENV === 'development') {
+        // In development mode, skip remote API and use local credentials from credentials.json
+        initializeCredentialsAPI(null, null);
+        console.log('✓ Credentials: using LOCAL credentials (development mode)');
+    } else if (credentials.scraperCredentials && credentials.scraperCredentials.apiUrl && credentials.scraperCredentials.apiKey) {
         initializeCredentialsAPI(
             credentials.scraperCredentials.apiUrl,
             credentials.scraperCredentials.apiKey
@@ -523,6 +527,13 @@ async function autoCheckQueue() {
 }
 
 function startAutoQueueChecker() {
+    // Skip auto queue checker in local development
+    if (process.env.NODE_ENV === 'development') {
+        console.log('\n⚠️  Auto Queue Checker: DISABLED (development mode)');
+        console.log('   Set NODE_ENV=production or use "npm start" to enable.\n');
+        return;
+    }
+
     // Check if Blacklight is configured
     if (!credentials.blacklight || !credentials.blacklight.apiUrl || !credentials.blacklight.apiKey) {
         console.log('\n⚠️  Blacklight API not configured. Auto queue checking disabled.');

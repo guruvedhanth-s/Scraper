@@ -116,33 +116,58 @@ async function connectToChrome() {
     }
 }
 
-async function loginToLinkedIn(page) {
-    logProgress('LinkedIn', '🔐 Checking login status...');
+// Helper: Check if a URL indicates an unauthenticated/login page
+function isLoginPage(url) {
+    return url.includes('/login') || 
+           url.includes('/uas/login') || 
+           url.includes('/checkpoint/lg/') ||
+           url.includes('/authwall') ||
+           url.includes('session_redirect');
+}
+
+// Helper: Check if a URL indicates an authenticated page
+function isAuthenticatedPage(url) {
+    return (url.includes('/feed') || 
+            url.includes('/mynetwork') || 
+            url.includes('/search/results') ||
+            url.includes('/in/') ||
+            url.includes('/jobs')) &&
+           !isLoginPage(url);
+}
+
+async function ensureLoggedIn(page) {
+    logProgress('LinkedIn', '🔐 Verifying authentication status...');
+    
+    // Navigate to feed to reliably check login state
+    await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await randomDelay(3000, 5000);
     
     const currentUrl = page.url();
+    logProgress('LinkedIn', `   Current URL after feed navigation: ${currentUrl}`);
     
-    // Check if already logged in
-    const isLoggedIn = await page.evaluate(() => {
-        const bodyText = document.body.innerText;
-        return !bodyText.includes('Sign in') && 
-               !window.location.href.includes('/login') &&
-               !bodyText.includes('Join now');
-    });
-    
-    if (isLoggedIn) {
-        logProgress('LinkedIn', '✅ Already logged in!');
+    // If we landed on the feed, we're logged in
+    if (isAuthenticatedPage(currentUrl)) {
+        logProgress('LinkedIn', '✅ Already logged in (verified via feed navigation)');
         return true;
     }
     
-    logProgress('LinkedIn', '🔑 Not logged in, proceeding to login...');
+    // We got redirected to a login page - need to perform login
+    logProgress('LinkedIn', '🔑 Not logged in, performing login...');
+    await performLogin(page);
+    return true;
+}
+
+async function performLogin(page) {
+    const currentUrl = page.url();
     
-    // Navigate to login page
-    if (!currentUrl.includes('/login') && !currentUrl.includes('/checkpoint')) {
+    // Navigate to login page if not already there
+    if (!currentUrl.includes('/login') && !currentUrl.includes('/uas/login')) {
         logProgress('LinkedIn', '📍 Navigating to login page...');
-        await page.goto('https://www.linkedin.com/login');
+        await page.goto('https://www.linkedin.com/login', { waitUntil: 'domcontentloaded', timeout: 30000 });
         await randomDelay(2000, 3000);
     }
-        // Check if "Sign in using another account" button exists and click it
+
+    // Check if "Sign in using another account" button exists and click it
     try {
         const anotherAccountButton = await page.$('button.signin-other-account, button.artdeco-list__item.signin-other-account, .signin-other-account');
         if (anotherAccountButton) {
@@ -157,7 +182,8 @@ async function loginToLinkedIn(page) {
         // Button not found, continue to email field
         logProgress('LinkedIn', '   No account selection page, proceeding to email field...');
     }
-        // Fill email
+
+    // Fill email
     logProgress('LinkedIn', `📧 Entering email: ${CONFIG.email}`);
     await page.waitForSelector('#username', { timeout: 10000 });
     await page.click('#username');
@@ -217,28 +243,31 @@ async function loginToLinkedIn(page) {
         await page.keyboard.press('Enter');
     }
     
-    // Wait longer for LinkedIn to process login and redirect
+    // Wait for LinkedIn to process login and redirect
     logProgress('LinkedIn', '⏳ Waiting for login to complete...');
-    await randomDelay(8000, 10000);
+    
+    // Wait for navigation away from login page (up to 15s)
+    try {
+        await page.waitForURL(url => !isLoginPage(url.toString()), { timeout: 15000 });
+        logProgress('LinkedIn', '   Login redirect detected');
+    } catch {
+        logProgress('LinkedIn', '   Login redirect wait timed out, checking page state...');
+    }
+    
+    await randomDelay(3000, 5000);
     
     // Check the result
     const finalUrl = page.url();
     logProgress('LinkedIn', `   Current URL: ${finalUrl}`);
     
-    // First check: Are we successfully logged in? (on feed or authenticated page)
-    const isOnAuthenticatedPage = finalUrl.includes('/feed') || 
-                                   finalUrl.includes('/mynetwork') || 
-                                   finalUrl.includes('/search') ||
-                                   finalUrl.includes('/in/') ||
-                                   finalUrl.includes('/jobs');
-    
-    if (isOnAuthenticatedPage) {
+    // First check: Are we successfully logged in? (on an authenticated page)
+    if (isAuthenticatedPage(finalUrl)) {
         logProgress('LinkedIn', '✅ Login successful!');
         return true;
     }
     
     // Check for explicit error messages (only if still on login-related pages)
-    if (finalUrl.includes('/login') || finalUrl.includes('/uas/login')) {
+    if (isLoginPage(finalUrl)) {
         const hasError = await page.evaluate(() => {
             const errorText = document.body.innerText.toLowerCase();
             const hasErrorMessage = errorText.includes('wrong email or password') || 
@@ -275,19 +304,14 @@ async function loginToLinkedIn(page) {
 async function navigateToSearch(page, query) {
     logProgress('LinkedIn', `🔍 Boolean Search: ("${CONFIG.jobTitle}" AND "${CONFIG.location}") OR "c2c"`);
     
-    // Make sure we're logged in first
-    await loginToLinkedIn(page);
-    
-    // Navigate to feed first to establish session
-    logProgress('LinkedIn', '📍 Navigating to LinkedIn feed first...');
-    await page.goto('https://www.linkedin.com/feed/');
-    await randomDelay(2000, 3000);
+    // Verify login by navigating to feed (this also establishes session)
+    await ensureLoggedIn(page);
     
     // Choose between feed (with URLs) or search (filtered but less reliable URLs)
     if (CONFIG.useFeedInsteadOfSearch) {
         logProgress('LinkedIn', '✅ Using main feed (posts will have URLs)');
         logProgress('LinkedIn', `🔍 Filtering: ("${CONFIG.jobTitle}" AND "${CONFIG.location}") OR "c2c"`);
-        // Stay on feed page
+        // Stay on feed page (ensureLoggedIn already navigated to feed)
     } else {
         // Construct direct content search URL - matches LinkedIn's format
         const searchKeywords = `${CONFIG.jobTitle} ${CONFIG.location}`;
@@ -301,6 +325,72 @@ async function navigateToSearch(page, query) {
         // Navigate directly to content search results
         await page.goto(contentSearchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await randomDelay(4000, 6000);
+        
+        // Check if LinkedIn redirected us to a login page (US behavior)
+        const postNavUrl = page.url();
+        if (isLoginPage(postNavUrl)) {
+            logProgress('LinkedIn', '⚠️  Search page redirected to login (US LinkedIn behavior)');
+            logProgress('LinkedIn', '🔑 Performing login and retrying search...');
+            
+            // Perform login
+            await performLogin(page);
+            await randomDelay(2000, 3000);
+            
+            // Retry the search navigation
+            logProgress('LinkedIn', '🔄 Retrying content search navigation...');
+            await page.goto(contentSearchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await randomDelay(4000, 6000);
+            
+            // If still redirected to login, try using the search bar from feed
+            const retryUrl = page.url();
+            if (isLoginPage(retryUrl)) {
+                logProgress('LinkedIn', '⚠️  Still redirected to login after re-login');
+                logProgress('LinkedIn', '🔄 Trying alternative: search from feed page...');
+                
+                // Go to feed first
+                await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+                await randomDelay(3000, 5000);
+                
+                // Use the search bar on the feed page
+                try {
+                    const searchInput = await page.$('input.search-global-typeahead__input, input[placeholder*="Search"], input[role="combobox"]');
+                    if (searchInput) {
+                        logProgress('LinkedIn', '   Found search bar, typing search query...');
+                        await searchInput.click();
+                        await randomDelay(500, 1000);
+                        await searchInput.type(searchKeywords, { delay: 50 });
+                        await randomDelay(500, 1000);
+                        await page.keyboard.press('Enter');
+                        await randomDelay(3000, 5000);
+                        
+                        // Click on "Posts" filter tab to get content results
+                        try {
+                            const postsTab = await page.$('button[aria-label*="Posts"], a[href*="content"], button:has-text("Posts")');
+                            if (postsTab) {
+                                logProgress('LinkedIn', '   Clicking "Posts" filter tab...');
+                                await postsTab.click();
+                                await randomDelay(3000, 5000);
+                            } else {
+                                // Try clicking by text content
+                                await page.evaluate(() => {
+                                    const buttons = [...document.querySelectorAll('button, a')];
+                                    const postsBtn = buttons.find(b => b.textContent.trim() === 'Posts');
+                                    if (postsBtn) postsBtn.click();
+                                });
+                                await randomDelay(3000, 5000);
+                            }
+                        } catch (tabError) {
+                            logProgress('LinkedIn', `   Could not find Posts tab: ${tabError.message}`);
+                        }
+                    } else {
+                        logProgress('LinkedIn', '   Search bar not found, staying on feed page');
+                    }
+                } catch (searchError) {
+                    logProgress('LinkedIn', `   Search bar approach failed: ${searchError.message}`);
+                    logProgress('LinkedIn', '   Falling back to feed mode...');
+                }
+            }
+        }
     }
     
     // Verify we're on the right page
