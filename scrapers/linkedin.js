@@ -14,9 +14,9 @@ const __dirname = dirname(__filename);
 // Configuration
 const CONFIG = {
     cdpUrl: 'http://localhost:9222',
-    searchQuery: 'devops c2c us contract remote sre cloud engineer',  // Boolean: (jobTitle AND location) OR "c2c"
-    jobTitle: 'devops',  // Will be set dynamically
-    location: 'us',  // Will be set dynamically
+    searchQuery: '',   // Will be built as a boolean query dynamically
+    jobTitle: '',      // Will be set dynamically
+    location: '',      // Will be set dynamically
     maxPosts: 100,
     scrollDelay: 2000,
     // LinkedIn credentials (fetched from API)
@@ -26,6 +26,47 @@ const CONFIG = {
     // Use search instead of feed for better job targeting
     useFeedInsteadOfSearch: false  // Set to true to use feed (has URLs but less relevant)
 };
+
+/**
+ * Build a LinkedIn boolean search query.
+ * 
+ * LinkedIn content search supports: "exact phrase", AND, OR, NOT, parentheses.
+ * 
+ * Examples:
+ *   jobTitle="DevOps Engineer", location="California"
+ *   => "DevOps Engineer" AND "California" AND "c2c"
+ * 
+ *   jobTitle="Product Owner", location="US"
+ *   => "Product Owner" AND "US" AND "c2c"
+ * 
+ *   jobTitle="DevOps Engineer", location="California"
+ *   => "DevOps Engineer" AND "California" AND "US" AND "c2c"
+ * 
+ *   jobTitle="Product Owner", location="US"
+ *   => "Product Owner" AND "US" AND "c2c"
+ * 
+ *   jobTitle="SRE", location="New York"
+ *   => "SRE" AND "New York" AND "US" AND "c2c"
+ * 
+ * @param {string} jobTitle - The job title/role to search for
+ * @param {string} location - The US location to search in
+ * @returns {string} LinkedIn boolean search query string
+ */
+function buildBooleanSearchQuery(jobTitle, location) {
+    // Wrap each term in quotes for exact phrase matching
+    const titlePart = `"${jobTitle}"`;
+    const locationPart = `"${location}"`;
+    const c2cPart = `"c2c"`;
+
+    // Always include "US" unless the location itself is already "US"
+    const isAlreadyUS = location.trim().toLowerCase() === 'us';
+
+    if (isAlreadyUS) {
+        return `${titlePart} AND ${locationPart} AND ${c2cPart}`;
+    }
+
+    return `${titlePart} AND ${locationPart} AND "US" AND ${c2cPart}`;
+}
 
 // Helper: Wait function
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -302,7 +343,7 @@ async function performLogin(page) {
 }
 
 async function navigateToSearch(page, query) {
-    logProgress('LinkedIn', `🔍 Boolean Search: ("${CONFIG.jobTitle}" AND "${CONFIG.location}") OR "c2c"`);
+    logProgress('LinkedIn', `🔍 Boolean Search Query: ${CONFIG.searchQuery}`);
     
     // Verify login by navigating to feed (this also establishes session)
     await ensureLoggedIn(page);
@@ -310,16 +351,15 @@ async function navigateToSearch(page, query) {
     // Choose between feed (with URLs) or search (filtered but less reliable URLs)
     if (CONFIG.useFeedInsteadOfSearch) {
         logProgress('LinkedIn', '✅ Using main feed (posts will have URLs)');
-        logProgress('LinkedIn', `🔍 Filtering: ("${CONFIG.jobTitle}" AND "${CONFIG.location}") OR "c2c"`);
+        logProgress('LinkedIn', `🔍 Filtering: ${CONFIG.searchQuery}`);
         // Stay on feed page (ensureLoggedIn already navigated to feed)
     } else {
-        // Construct direct content search URL - matches LinkedIn's format
-        const searchKeywords = `${CONFIG.jobTitle} ${CONFIG.location}`;
-        const encodedQuery = encodeURIComponent(searchKeywords);
+        // Use the boolean search query directly in the URL
+        const encodedQuery = encodeURIComponent(CONFIG.searchQuery);
         const contentSearchUrl = `https://www.linkedin.com/search/results/content/?keywords=${encodedQuery}&origin=SWITCH_SEARCH_VERTICAL&sid=*To`;
         
         logProgress('LinkedIn', `🔗 Navigating to content search page...`);
-        logProgress('LinkedIn', `   Search: "${searchKeywords}"`);
+        logProgress('LinkedIn', `   Query: ${CONFIG.searchQuery}`);
         logProgress('LinkedIn', `   URL: ${contentSearchUrl}`);
         
         // Navigate directly to content search results
@@ -351,14 +391,14 @@ async function navigateToSearch(page, query) {
                 await page.goto('https://www.linkedin.com/feed/', { waitUntil: 'domcontentloaded', timeout: 30000 });
                 await randomDelay(3000, 5000);
                 
-                // Use the search bar on the feed page
+                // Use the search bar on the feed page with the boolean query
                 try {
                     const searchInput = await page.$('input.search-global-typeahead__input, input[placeholder*="Search"], input[role="combobox"]');
                     if (searchInput) {
-                        logProgress('LinkedIn', '   Found search bar, typing search query...');
+                        logProgress('LinkedIn', `   Found search bar, typing boolean query: ${CONFIG.searchQuery}`);
                         await searchInput.click();
                         await randomDelay(500, 1000);
-                        await searchInput.type(searchKeywords, { delay: 50 });
+                        await searchInput.type(CONFIG.searchQuery, { delay: 50 });
                         await randomDelay(500, 1000);
                         await page.keyboard.press('Enter');
                         await randomDelay(3000, 5000);
@@ -434,7 +474,7 @@ async function extractPosts(page, maxPosts) {
     const keywords = CONFIG.searchQuery.toLowerCase().split(' ');
     
     if (isFeedMode) {
-        logProgress('LinkedIn', `   📋 Boolean Logic: ("${CONFIG.jobTitle}" AND "${CONFIG.location}") OR "c2c"\n`);
+        logProgress('LinkedIn', `   📋 Boolean Query: ${CONFIG.searchQuery}\n`);
     } else {
         logProgress('LinkedIn', '   Note: Only extracting CONTENT posts (not people/jobs/companies)\n');
     }
@@ -871,9 +911,13 @@ export async function scrapeLinkedIn(jobTitle, location, sessionId = null) {
     logProgress('LinkedIn', '='.repeat(50));
     
     // Override CONFIG with parameters
-    CONFIG.jobTitle = jobTitle.toLowerCase();
-    CONFIG.location = location.toLowerCase();
-    CONFIG.searchQuery = `${jobTitle} ${location} c2c contract remote`;  // Display query
+    CONFIG.jobTitle = jobTitle;
+    CONFIG.location = location;
+    CONFIG.searchQuery = buildBooleanSearchQuery(jobTitle, location);
+    
+    logProgress('LinkedIn', `   Job Title: "${jobTitle}"`);
+    logProgress('LinkedIn', `   Location: "${location}"`);
+    logProgress('LinkedIn', `   Boolean Query: ${CONFIG.searchQuery}\n`);
     
     const apiClient = getCredentialsAPIClient();
     const maxAttempts = 3;
