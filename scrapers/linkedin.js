@@ -17,7 +17,7 @@ const CONFIG = {
     searchQuery: '',   // Will be built as a boolean query dynamically
     jobTitle: '',      // Will be set dynamically
     location: '',      // Will be set dynamically
-    maxPosts: 100,
+    maxPosts: 30,
     scrollDelay: 2000,
     // LinkedIn credentials (fetched from API)
     email: null,
@@ -55,17 +55,12 @@ const CONFIG = {
 function buildBooleanSearchQuery(jobTitle, location) {
     // Wrap each term in quotes for exact phrase matching
     const titlePart = `"${jobTitle}"`;
-    const locationPart = `"${location}"`;
     const c2cPart = `"c2c"`;
+    const w2Part = `"W2"`;
+    const usPart = `"US"`;
 
-    // Always include "US" unless the location itself is already "US"
-    const isAlreadyUS = location.trim().toLowerCase() === 'us';
-
-    if (isAlreadyUS) {
-        return `${titlePart} AND ${locationPart} AND ${c2cPart}`;
-    }
-
-    return `${titlePart} AND ${locationPart} AND "US" AND ${c2cPart}`;
+    // Pattern: "Job Title" AND "c2c" OR "W2" AND "US"
+    return `${titlePart} AND ${c2cPart} OR ${w2Part} AND ${usPart}`;
 }
 
 // Helper: Wait function
@@ -356,7 +351,7 @@ async function navigateToSearch(page, query) {
     } else {
         // Use the boolean search query directly in the URL
         const encodedQuery = encodeURIComponent(CONFIG.searchQuery);
-        const contentSearchUrl = `https://www.linkedin.com/search/results/content/?keywords=${encodedQuery}&origin=SWITCH_SEARCH_VERTICAL&sid=*To`;
+        const contentSearchUrl = `https://www.linkedin.com/search/results/content/?datePosted=%22past-week%22&keywords=${encodedQuery}&origin=FACETED_SEARCH&sid=*To`;
         
         logProgress('LinkedIn', `🔗 Navigating to content search page...`);
         logProgress('LinkedIn', `   Query: ${CONFIG.searchQuery}`);
