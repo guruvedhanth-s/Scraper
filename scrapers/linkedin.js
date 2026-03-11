@@ -16,8 +16,7 @@ const CONFIG = {
     cdpUrl: 'http://localhost:9222',
     searchQuery: '',   // Will be built as a boolean query dynamically
     jobTitle: '',      // Will be set dynamically
-    location: '',      // Will be set dynamically
-    maxPosts: 30,
+    maxPosts: 50,
     scrollDelay: 2000,
     // LinkedIn credentials (fetched from API)
     email: null,
@@ -33,34 +32,23 @@ const CONFIG = {
  * LinkedIn content search supports: "exact phrase", AND, OR, NOT, parentheses.
  * 
  * Examples:
- *   jobTitle="DevOps Engineer", location="California"
- *   => "DevOps Engineer" AND "California" AND "c2c"
+ *   jobTitle="DevOps Engineer"
+ *   => "DevOps Engineer" AND (c2c OR W2 OR 1099)
  * 
- *   jobTitle="Product Owner", location="US"
- *   => "Product Owner" AND "US" AND "c2c"
+ *   jobTitle="Product Owner"
+ *   => "Product Owner" AND (c2c OR W2 OR 1099)
  * 
- *   jobTitle="DevOps Engineer", location="California"
- *   => "DevOps Engineer" AND "California" AND "US" AND "c2c"
- * 
- *   jobTitle="Product Owner", location="US"
- *   => "Product Owner" AND "US" AND "c2c"
- * 
- *   jobTitle="SRE", location="New York"
- *   => "SRE" AND "New York" AND "US" AND "c2c"
+ *   jobTitle="SRE"
+ *   => "SRE" AND (c2c OR W2 OR 1099)
  * 
  * @param {string} jobTitle - The job title/role to search for
- * @param {string} location - The US location to search in
  * @returns {string} LinkedIn boolean search query string
  */
-function buildBooleanSearchQuery(jobTitle, location) {
-    // Wrap each term in quotes for exact phrase matching
+function buildBooleanSearchQuery(jobTitle) {
     const titlePart = `"${jobTitle}"`;
-    const c2cPart = `"c2c"`;
-    const w2Part = `"W2"`;
-    const usPart = `"US"`;
 
-    // Pattern: "Job Title" AND "c2c" OR "W2" AND "US"
-    return `${titlePart} AND ${c2cPart} OR ${w2Part} AND ${usPart}`;
+    // Pattern: "Job Title" AND (c2c OR W2 OR 1099)
+    return `${titlePart} AND (c2c OR W2 OR 1099)`;
 }
 
 // Helper: Wait function
@@ -905,13 +893,11 @@ export async function scrapeLinkedIn(jobTitle, location, sessionId = null) {
     logProgress('LinkedIn', '🚀 LinkedIn Post Scraper (CDP Method)\n');
     logProgress('LinkedIn', '='.repeat(50));
     
-    // Override CONFIG with parameters
+    // Override CONFIG with parameters (location is ignored, search uses only jobTitle)
     CONFIG.jobTitle = jobTitle;
-    CONFIG.location = location;
-    CONFIG.searchQuery = buildBooleanSearchQuery(jobTitle, location);
+    CONFIG.searchQuery = buildBooleanSearchQuery(jobTitle);
     
     logProgress('LinkedIn', `   Job Title: "${jobTitle}"`);
-    logProgress('LinkedIn', `   Location: "${location}"`);
     logProgress('LinkedIn', `   Boolean Query: ${CONFIG.searchQuery}\n`);
     
     const apiClient = getCredentialsAPIClient();
