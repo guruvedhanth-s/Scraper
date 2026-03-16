@@ -401,15 +401,17 @@ function extractJobDetailsFromHTML(html) {
     return jobDescription;
 }
 
-// Extract single job details
+// Extract single job details using proper Glassdoor detail URL
 async function extractSingleJobDetails(page, job, jobIndex, totalJobs) {
-    if (!job.jobLink) {
+    if (!job.jobId) {
         job.details = null;
         return;
     }
 
     try {
-        await page.goto(job.jobLink, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // Build a proper Glassdoor job detail URL from the jobListingId
+        const detailUrl = `https://www.glassdoor.co.in/job-listing/j?jl=${job.jobId}`;
+        await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForTimeout(humanDelay(3000, 5000));
 
         const detailHtml = await page.content();
@@ -520,10 +522,10 @@ export async function scrapeGlassdoor(jobTitle, location, sessionId = null) {
         // Mark as login success if we got past homepage
         loginSuccess = true;
 
-        // Navigate to search - use simple search URL that works globally
+        // Navigate to search - use simple search URL with fromAge=7 filter
         const encodedJobTitle = encodeURIComponent(jobTitle);
         const encodedLocation = encodeURIComponent(location);
-        const searchUrl = `https://www.${domain}/Job/jobs.htm?sc.keyword=${encodedJobTitle}&locT=N&locId=&jobType=&context=Jobs&sc.location=${encodedLocation}`;
+        const searchUrl = `https://www.${domain}/Job/jobs.htm?sc.keyword=${encodedJobTitle}&locT=N&locId=&jobType=&context=Jobs&sc.location=${encodedLocation}&fromAge=7`;
 
         logProgress('Glassdoor', 'Navigating to job search...');
         await page.goto(searchUrl, {
@@ -534,13 +536,13 @@ export async function scrapeGlassdoor(jobTitle, location, sessionId = null) {
 
         // Load all jobs
         await page.waitForTimeout(humanDelay(2000, 4000));
-        await loadAllJobs(page, 100);
+        await loadAllJobs(page, 30);
 
         // Extract jobs
         logProgress('Glassdoor', 'Extracting jobs from page...');
         const html = await page.content();
         const allJobs = extractJobsFromHTML(html);
-        const jobs = allJobs.slice(0, 100);
+        const jobs = allJobs.slice(0, 30);
 
         logProgress('Glassdoor', `Found ${jobs.length} jobs`);
 

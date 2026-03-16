@@ -135,7 +135,7 @@ class TechFetchScraper {
         logProgress('TechFetch', `URL: ${url}`);
         
         const response = await this.page.goto(url, {
-            waitUntil: 'networkidle',
+            waitUntil: 'domcontentloaded',
             timeout: 60000
         });
 
@@ -148,8 +148,8 @@ class TechFetchScraper {
         try {
             logProgress('TechFetch', `   Fetching details for: ${jobLink.split('/').pop().substring(0, 30)}...`);
             const response = await this.page.goto(jobLink, {
-                waitUntil: 'load',
-                timeout: 30000
+                waitUntil: 'domcontentloaded',
+                timeout: 3000
             });
             
             await this.page.waitForTimeout(1500);
@@ -442,7 +442,7 @@ class TechFetchScraper {
         return jobs;
     }
 
-    async scrapeJobs(keywords, location, maxPages = 5, includeDetails = true) {
+    async scrapeJobs(keywords, location, maxPages = 2, includeDetails = true) {
         await this.initialize();
         
         const loginSuccess = await this.login();
@@ -453,6 +453,7 @@ class TechFetchScraper {
         await this.search(keywords, location);
 
         const allJobs = [];
+        const maxJobs = 30;
         
         for (let page = 1; page <= maxPages; page++) {
             try {
@@ -503,6 +504,13 @@ class TechFetchScraper {
                 
                 allJobs.push(...jobs);
                 logProgress('TechFetch', `✅ Extracted ${jobs.length} jobs from page ${page} (Total: ${allJobs.length})`);
+                
+                // Stop if we've reached the job limit
+                if (allJobs.length >= maxJobs) {
+                    allJobs.splice(maxJobs); // Trim to exactly maxJobs
+                    logProgress('TechFetch', `Reached ${maxJobs} job limit. Stopping...`);
+                    break;
+                }
                 
                 // Rate limiting
                 if (page < maxPages) {
@@ -579,7 +587,7 @@ export async function scrapeTechFetch(jobTitle, location, sessionId = null) {
         let loginSuccess = false;
         
         try {
-            const maxPages = 5; // 5 pages = 100 jobs
+            const maxPages = 2; // 2 pages = up to 30 jobs
             const jobs = await scraper.scrapeJobs(jobTitle, location, maxPages, true);
             
             // Mark login as successful if we got this far

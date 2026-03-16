@@ -12,7 +12,7 @@ export async function scrapeMonster(jobTitle, location) {
         'content-type': 'application/json; charset=UTF-8',
         'origin': 'https://www.monster.com',
         'priority': 'u=1, i',
-        'referer': `https://www.monster.com/jobs/search?q=${encodeURIComponent(jobTitle)}&where=${encodeURIComponent(location)}&page=1&so=m.h.sh`,
+        'referer': `https://www.monster.com/jobs/search?q=${encodeURIComponent(jobTitle)}&where=${encodeURIComponent(location)}&page=1&recency=last+week&so=m.s.sh`,
         'request-starttime': Date.now().toString(),
         'sec-ch-ua': '"Microsoft Edge";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
         'sec-ch-ua-mobile': '?1',
@@ -38,7 +38,8 @@ export async function scrapeMonster(jobTitle, location) {
     const baseData = {
         "jobQuery": {
             "query": jobTitle,
-            "locations": [{"country": country, "address": address, "radius": {"unit": "mi", "value": 30}}]
+            "locations": [{"country": country, "address": address, "radius": {"unit": "mi", "value": 30}}],
+            "datePosted": "last week"
         },
         "jobAdsRequest": {
             "position": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],
