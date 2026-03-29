@@ -7,6 +7,7 @@ import { scrapeDice } from './scrapers/dice.js';
 import { scrapeTechFetch } from './scrapers/techfetch.js';
 import { scrapeLinkedIn } from './scrapers/linkedin.js';
 import { scrapeGlassdoor } from './scrapers/glassdoor.js';
+import { scrapeIndeed } from './scrapers/indeed.js';
 import { initializeCredentialsAPI } from './common/credentialsAPI.js';
 import { 
     sanitizeFilename, 
@@ -20,7 +21,7 @@ import {
 } from './common/utils.js';
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 // Middleware
 app.use(express.json());
@@ -56,7 +57,8 @@ const SCRAPERS = {
     dice: scrapeDice,
     techfetch: scrapeTechFetch,
     linkedin: scrapeLinkedIn,
-    glassdoor: scrapeGlassdoor
+    glassdoor: scrapeGlassdoor,
+    indeed: scrapeIndeed
 };
 
 // Available platforms

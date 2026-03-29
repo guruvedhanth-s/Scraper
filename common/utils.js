@@ -106,6 +106,7 @@ export function normalizeJobData(job, platform) {
 
         // Core job information
         job: {
+            id: job.id || job.jobId || job.postId || null,
             title: job.title || job.jobTitle || 'N/A',
             description: job.description || 'N/A',
             url: job.url || job.jobUrl || job.jobLink || 'N/A',
