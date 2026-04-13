@@ -1,15 +1,16 @@
 # Unified Job Scraper
 
-A powerful Node.js-based job scraping system that automatically collects job postings from multiple platforms (Monster, Dice, TechFetch, LinkedIn, Glassdoor) and integrates with the Blacklight backend for job matching.
+A powerful Node.js-based job scraping system that automatically collects job postings from multiple platforms (Monster, Dice, TechFetch, LinkedIn, Glassdoor, Indeed) and integrates with the Blacklight backend for job matching.
 
 ## 🚀 Features
 
-- **Multi-Platform Support**: Scrapes jobs from 5 major platforms
+- **Multi-Platform Support**: Scrapes jobs from 6 major platforms
   - Monster
   - Dice Jobs
   - TechFetch
   - LinkedIn
   - Glassdoor
+  - Indeed
 
 - **Blacklight Integration**: Seamless integration with Blacklight backend API
   - Queue-based role+location workflow
@@ -75,10 +76,10 @@ Create a `config/credentials.json` file with the following structure:
 }
 ```
 
-**Important**: 
+**Important**:
 - Replace `your-scraper-api-key-here` with your actual Blacklight API key
-- LinkedIn and Glassdoor credentials are automatically fetched from the Blacklight backend
-- Never commit this file to version control (it's in .gitignore)
+- LinkedIn, Glassdoor, Indeed, and TechFetch credentials can be fetched from the Blacklight backend or loaded from this file in local mode
+- **Never commit this file to version control.** It contains real credentials — add `config/credentials.json` to `.gitignore` before pushing. (This is tracked as a bug in the upcoming security PR.)
 
 ## 🎯 Usage
 
@@ -88,7 +89,7 @@ Create a `config/credentials.json` file with the following structure:
 npm start
 ```
 
-The server will start on `http://localhost:3000` with:
+The server will start on `http://localhost:3001` with:
 - ✅ REST API endpoints available
 - ✅ Auto queue checker running (checks every 30 seconds)
 - ✅ Connects to Blacklight backend for queue and credentials
@@ -109,7 +110,7 @@ Scrape jobs from specific platforms:
 
 ```bash
 # Single platform
-curl -X POST http://localhost:3000/scrape \
+curl -X POST http://localhost:3001/scrape \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "dice",
@@ -118,7 +119,7 @@ curl -X POST http://localhost:3000/scrape \
   }'
 
 # Multiple platforms
-curl -X POST http://localhost:3000/scrape \
+curl -X POST http://localhost:3001/scrape \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "monster,dice,techfetch",
@@ -127,7 +128,7 @@ curl -X POST http://localhost:3000/scrape \
   }'
 
 # All platforms
-curl -X POST http://localhost:3000/scrape \
+curl -X POST http://localhost:3001/scrape \
   -H "Content-Type: application/json" \
   -d '{
     "platform": "all",
@@ -139,7 +140,7 @@ curl -X POST http://localhost:3000/scrape \
 ### 2. Health Check
 
 ```bash
-curl http://localhost:3000/
+curl http://localhost:3001/
 ```
 
 Response:
@@ -147,7 +148,7 @@ Response:
 {
   "message": "Unified Job Scraper API is running",
   "version": "1.0.0",
-  "platforms": ["monster", "dice", "techfetch", "linkedin", "glassdoor"],
+  "platforms": ["monster", "dice", "techfetch", "linkedin", "glassdoor", "indeed"],
   "endpoints": {
     "scrape": "POST /scrape - Scrape jobs from platforms",
     "health": "GET / - API health check"
@@ -206,9 +207,10 @@ UnifiedJobScraper/
 ├── scrapers/                 # Platform-specific scrapers
 │   ├── monster.js           # Monster Jobs scraper
 │   ├── dice.js              # Dice Jobs scraper
-│   ├── techfetch.js         # TechFetch scraper
+│   ├── techfetch.js         # TechFetch scraper (requires login)
 │   ├── linkedin.js          # LinkedIn scraper (requires login)
-│   └── glassdoor.js         # Glassdoor scraper (requires cookies)
+│   ├── glassdoor.js         # Glassdoor scraper (requires cookies)
+│   └── indeed.js            # Indeed scraper (requires cookies)
 │
 ├── schemas/                  # Data schemas
 │   └── master-schema.json   # Unified job data schema
@@ -228,7 +230,7 @@ UnifiedJobScraper/
 You can set these environment variables:
 
 ```bash
-export PORT=3000                    # Server port (default: 3000)
+export PORT=3001                    # Server port (default: 3001)
 export QUEUE_CHECK_INTERVAL=30000   # Queue check interval in ms (default: 30000)
 ```
 
